@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BarangayCare — Navigation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/navigation.css">
+  <!-- Sidebar icons (optional). Remove if you don't want icons in the sidebar -->
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <!-- HEADER (no bell, no user circle) -->
+  <header class="topbar">
+    <div class="left-section">
+      <h2 class="logo">BarangayCare</h2>
+    </div>
+  </header>
+
+  <!-- LAYOUT -->
+  <div class="main-container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <ul class="nav-links">
+        <li class="active" data-page="home.html">
+          <i class="fas fa-home"></i><span>Home</span>
+        </li>
+        <li data-page="appointment.html">
+          <i class="fas fa-calendar-alt"></i><span>Book Appointment</span>
+        </li>
+        <li data-page="record.html">
+          <i class="fas fa-notes-medical"></i><span>Health Records</span>
+        </li>
+        <li data-page="teleconsult.html">
+          <i class="fas fa-comments"></i><span>Teleconsultation</span>
+        </li>
+      </ul>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <section class="content">
+      <iframe id="pageFrame" src="home.html" class="iframe-page" title="BarangayCare Page"></iframe>
+    </section>
+  </div>
+
+  <script>
+    // Simple router to swap pages inside the iframe
+    const frame = document.getElementById('pageFrame');
+    document.querySelectorAll('.nav-links li').forEach(li => {
+      li.addEventListener('click', () => {
+        document.querySelectorAll('.nav-links li').forEach(n => n.classList.remove('active'));
+        li.classList.add('active');
+        const page = li.getAttribute('data-page');
+        if (page) frame.src = page;
+      });
+    });
+  </script>
+</body>
+</html>
