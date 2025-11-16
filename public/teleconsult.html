@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BarangayCare — Teleconsultation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/teleconsult.css">
+</head>
+<body>
+  <main class="page">
+    <h3 class="section-title">Teleconsultation</h3>
+
+    <!-- Consultation type -->
+    <section class="type-card">
+      <div class="type-title">Consultation Type</div>
+      <div class="type-grid">
+        <button class="type-pill" data-type="General" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v6a4 4 0 1 0 8 0V3h-2v6a2 2 0 1 1-4 0V3H6zM18 11a3 3 0 0 0-3 3v1a4 4 0 0 1-8 0v-1h2v1a2 2 0 0 0 4 0v-1a5 5 0 0 1 10 0v1a4 4 0 0 1-4 4h-1v-2h1a2 2 0 0 0 2-2v-1a3 3 0 0 0-3-3z"/></svg>
+          <span>General</span>
+        </button>
+
+        <button class="type-pill active" data-type="Medicine Question" aria-pressed="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 3A4.5 4.5 0 0 0 3 7.5c0 1.2.47 2.35 1.32 3.18l9 9a4.5 4.5 0 0 0 6.36-6.36l-9-9A4.48 4.48 0 0 0 7.5 3zm0 2c.58 0 1.15.17 1.64.49L6.5 8.12 4.86 6.5A2.5 2.5 0 0 1 7.5 5zm10.64 7.5L16.5 14.88 9.12 7.5l1.64-1.62 7.38 7.38z"/></svg>
+          <span>Medicine Question</span>
+        </button>
+
+        <button class="type-pill" data-type="Symptom Advice" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.76V5a3 3 0 1 0-6 0v9.76a5 5 0 1 0 6 0zM10 5a1 1 0 0 1 2 0v10.41l.29.2a3 3 0 1 1-2.58 0l.29-.2V5z"/></svg>
+          <span>Symptom Advice</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Chat area -->
+    <section class="chat-card">
+      <div class="chat">
+        <div class="bubble outgoing">
+          Hello po, I was prescribed Amoxicillin 500mg. How many days should I take it?
+          <div class="time">2:10 PM</div>
+        </div>
+
+        <div class="bubble incoming">
+          Hi! For most infections, Amoxicillin 500mg is taken every 8 hours (3 times a day) for 7 days, unless your doctor advised otherwise. Make sure to finish the full course even if you feel better.
+          <div class="time">2:11 PM</div>
+        </div>
+      </div>
+
+      <form class="composer" onsubmit="sendMessage(event)">
+        <input id="msg" type="text" placeholder="Write a message" autocomplete="off">
+        <button class="send" aria-label="Send">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4l1.9 7.3 8.3 1.3-8.3 1.3-1.9 7.3z"/></svg>
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    // Toggle active pill (visual only)
+    document.querySelectorAll('.type-pill').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.type-pill').forEach(b=>{
+          b.classList.remove('active'); b.setAttribute('aria-pressed','false');
+        });
+        btn.classList.add('active'); btn.setAttribute('aria-pressed','true');
+      });
+    });
+
+    function timeNow(){
+      return new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+    }
+    function sendMessage(e){
+      e.preventDefault();
+      const input = document.getElementById('msg');
+      const text = input.value.trim();
+      if(!text) return;
+      const chat = document.querySelector('.chat');
+
+      const msg = document.createElement('div');
+      msg.className = 'bubble outgoing';
+      msg.textContent = text;
+
+      const t = document.createElement('div');
+      t.className = 'time';
+      t.textContent = timeNow();
+      msg.appendChild(t);
+
+      chat.appendChild(msg);
+      input.value = '';
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>

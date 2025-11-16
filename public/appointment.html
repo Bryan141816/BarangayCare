@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BarangayCare — Book Appointment</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/appointment.css">
+</head>
+<body>
+  <main class="page">
+    <h3 class="page-title">Book Appointment</h3>
+
+    <section class="card">
+      <form class="form" action="#" method="post">
+        <!-- Service -->
+        <label class="sr-only" for="service">Service Type</label>
+        <select id="service" class="input">
+          <option value="" selected disabled>Select Service Type</option>
+          <option>General Checkup</option>
+          <option>Vaccination</option>
+          <option>Prenatal Consultation</option>
+          <option>Dental</option>
+        </select>
+
+        <!-- Preferred Date/Time (kept as text to match placeholder in screenshot) -->
+        <label class="sr-only" for="datetime">Preferred Date Time</label>
+        <input id="datetime" class="input" type="text" placeholder="Select Preferred Date Time">
+
+        <!-- Health Center -->
+        <label class="sr-only" for="center">Health Center</label>
+        <select id="center" class="input">
+          <option value="" selected disabled>Select Health Center</option>
+          <option>Barangay Health Center</option>
+          <option>Municipal Health Office</option>
+          <option>District Clinic</option>
+        </select>
+
+        <!-- Purpose -->
+        <label class="sr-only" for="reason">Purpose / Reason</label>
+        <textarea id="reason" class="input textarea" placeholder="Purpose / Reason"></textarea>
+
+        <!-- Submit -->
+        <button class="btn" type="submit">Submit</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
