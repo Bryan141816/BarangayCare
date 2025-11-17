@@ -4,6 +4,7 @@ import { Navigate } from "react-router-dom";
 // Lazy load the Login page
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
+const ProtectedRoute = lazy(() => import("./components/ProtectedRoute"));
 const MainLayout = lazy(() => import("./layout/Mainlayout"));
 const Home = lazy(() => import("./pages/Home"));
 const BookAppointments = lazy(() => import("./pages/BookAppointments"));
@@ -25,7 +26,14 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 
-          <Route path="/" element={<MainLayout />}>
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<Navigate to="/home" replace />} />
             <Route path="home" element={<Home />} />
             <Route path="book-appointment" element={<BookAppointments />} />
