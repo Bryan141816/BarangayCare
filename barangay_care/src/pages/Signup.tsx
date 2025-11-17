@@ -1,7 +1,10 @@
 // pages/SignUpPage.tsx
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { registerUser } from "../service/authservice";
 const SignUpPage = () => {
+  const navigate = useNavigate();
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [address, setAddress] = useState("");
@@ -15,6 +18,7 @@ const SignUpPage = () => {
   const [passwordStrength, setPasswordStrength] = useState(""); // weak/medium/strong
   const [confirmError, setConfirmError] = useState("");
 
+  const [errorMessage, setErrorMessage] = useState("");
   // Check password strength
   useEffect(() => {
     if (!password) {
@@ -42,22 +46,32 @@ const SignUpPage = () => {
     );
   }, [confirmPassword, password]);
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (confirmError) return;
+    setErrorMessage(""); // clear old error
 
-    // TODO: Add sign-up logic
-    console.log({
+    if (confirmError) {
+      setErrorMessage("Passwords do not match");
+      return;
+    }
+
+    const result = await registerUser({
       firstName,
       lastName,
       address,
-      age,
+      age: Number(age),
       gender,
       birthday,
       email,
       password,
     });
+
+    if (result.success) {
+      navigate("/login");
+    } else {
+      setErrorMessage(result.error || "Something went wrong");
+    }
   };
 
   // Helper for password bar color
@@ -66,6 +80,22 @@ const SignUpPage = () => {
     if (passwordStrength === "medium") return "bg-yellow-500 w-2/3";
     if (passwordStrength === "strong") return "bg-green-500 w-full";
     return "w-0";
+  };
+  const calculateAge = (dateString: string) => {
+    const today = new Date();
+    const birthDate = new Date(dateString);
+
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+
+    return age;
   };
 
   return (
@@ -78,6 +108,12 @@ const SignUpPage = () => {
           Fill in your details to create an account
         </p>
         <form onSubmit={handleSignUp} className="flex flex-col gap-[10px]">
+          {errorMessage && (
+            <p className="text-red-500 text-sm font-medium text-center">
+              {errorMessage}
+            </p>
+          )}
+
           <input
             type="text"
             placeholder="First Name"
@@ -103,12 +139,22 @@ const SignUpPage = () => {
             required
           />
           <input
+            type="date"
+            value={birthday}
+            onChange={(e) => {
+              setBirthday(e.target.value);
+              setAge(calculateAge(e.target.value).toString());
+            }}
+            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F8A69]"
+            required
+          />
+          <input
             type="number"
             placeholder="Age"
             value={age}
             onChange={(e) => setAge(e.target.value)}
             className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F8A69]"
-            required
+            disabled
           />
           <select
             value={gender}
@@ -121,13 +167,6 @@ const SignUpPage = () => {
             <option value="female">Female</option>
             <option value="other">Other</option>
           </select>
-          <input
-            type="date"
-            value={birthday}
-            onChange={(e) => setBirthday(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F8A69]"
-            required
-          />
           <input
             type="email"
             placeholder="Email"

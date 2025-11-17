@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
-
+import { Navigate } from "react-router-dom";
 // Lazy load the Login page
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
@@ -26,6 +26,7 @@ function App() {
           <Route path="/signup" element={<Signup />} />
 
           <Route path="/" element={<MainLayout />}>
+            <Route index element={<Navigate to="/home" replace />} />
             <Route path="home" element={<Home />} />
             <Route path="book-appointment" element={<BookAppointments />} />
             <Route path="health-records" element={<HealthRecords />} />

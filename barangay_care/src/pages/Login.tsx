@@ -1,14 +1,22 @@
 // pages/LoginPage.jsx
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { loginUser } from "../service/authservice";
 const LoginPage = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const handleLogin = (e: React.FormEvent) => {
+  const [errorMessage, setErrorMessage] = useState("");
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Add login logic (Firebase, API, etc.)
-    console.log("Email:", email, "Password:", password);
+
+    const result = await loginUser(email, password);
+
+    if (result.success) {
+      navigate("/home"); // or wherever you want
+    } else {
+      setErrorMessage(result.error);
+    }
   };
 
   return (
@@ -25,6 +33,11 @@ const LoginPage = () => {
             Enter your credentials to continue
           </p>
           <div>
+            {errorMessage && (
+              <p className="text-red-500 text-sm font-medium text-center">
+                {errorMessage}
+              </p>
+            )}
             <input
               type="email"
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
