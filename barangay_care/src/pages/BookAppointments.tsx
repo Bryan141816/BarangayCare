@@ -109,6 +109,7 @@ export default function BookAppointment() {
         (a) =>
           a.status !== "completed" &&
           a.status !== "rejected" &&
+          a.status !== "failed" &&
           a.requestedBy === currentUser?.uid,
       );
 
