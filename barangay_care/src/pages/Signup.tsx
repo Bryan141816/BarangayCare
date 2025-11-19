@@ -19,6 +19,8 @@ const SignUpPage = () => {
   const [confirmError, setConfirmError] = useState("");
 
   const [errorMessage, setErrorMessage] = useState("");
+
+  const [loading, setLoading] = useState(false);
   // Check password strength
   useEffect(() => {
     if (!password) {
@@ -49,10 +51,14 @@ const SignUpPage = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    setErrorMessage(""); // clear old error
+    if (loading) return; // prevents multiple clicks
+
+    setErrorMessage("");
+    setLoading(true); // START LOADING
 
     if (confirmError) {
       setErrorMessage("Passwords do not match");
+      setLoading(false);
       return;
     }
 
@@ -65,7 +71,10 @@ const SignUpPage = () => {
       birthday,
       email,
       password,
+      role: "user",
     });
+
+    setLoading(false); // END LOADING
 
     if (result.success) {
       navigate("/login");
@@ -228,9 +237,18 @@ const SignUpPage = () => {
 
           <button
             type="submit"
-            className="w-full bg-[#0F8A69] hover:bg-[#0D7A5B] text-white py-2 rounded-lg transition duration-200"
+            disabled={loading}
+            className={`w-full py-2 rounded-lg transition duration-200 
+    ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#0F8A69] hover:bg-[#0D7A5B] text-white"}
+  `}
           >
-            Sign Up
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <div className="w-5 h-5 border-4 border-t-green-500 border-gray-300 rounded-full animate-spin"></div>
+              </div>
+            ) : (
+              "Sign Up"
+            )}
           </button>
         </form>
         <p className="text-sm text-center text-gray-500 mt-4">

@@ -14,6 +14,7 @@ interface FirestoreUser {
   gender: string;
   birthday: string;
   email: string;
+  role: string;
 }
 
 interface AuthContextType {

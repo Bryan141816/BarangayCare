@@ -1,41 +1,125 @@
-import React from "react";
+import React, { useContext, useEffect, useState } from "react";
+import { AuthContext } from "../provider/AuthProvider";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase";
+
+// Heroicons
+import {
+  MapPinIcon,
+  CalendarDaysIcon,
+  ClockIcon,
+} from "@heroicons/react/24/outline";
+
+interface EventData {
+  id: string;
+  eventType: string;
+  title: string;
+  location: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
 
 export default function Home() {
-  const user = {
-    name: "Example User",
-    date: "Nov 6 2025",
+  const { currentUser, profile } = useContext(AuthContext);
+  const [events, setEvents] = useState<EventData[]>([]);
+
+  const formatTime = (hourString: string) => {
+    const hour = Number(hourString);
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const formatted = hour % 12 === 0 ? 12 : hour % 12;
+    return `${formatted}:00 ${suffix}`;
   };
 
-  const vaccinationAlert = {
-    title: "Vaccination Event",
-    location: "Location",
-    schedule: "Nov 7 2025 8-12 AM",
-  };
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "events"), (snapshot) => {
+      const list = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as EventData[];
+
+      // Filter: only show events that are TODAY or in the FUTURE
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // normalize
+
+      const filtered = list.filter((ev) => {
+        const evDate = new Date(ev.date);
+        evDate.setHours(0, 0, 0, 0);
+
+        return evDate >= today; // keep only upcoming events
+      });
+
+      setEvents(filtered);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
-    <div className="flex flex-col w-full bg-[#f1f5f9]">
-      {/* Header Card */}
-      <div className="bg-[#0F8A69] text-white rounded-xl border border-[#0A7C5D] shadow-md p-6 flex items-center justify-between ">
-        <h1 className="text-xl font-semibold">HI, {user.name}</h1>
-        <span className="text-md">{user.date}</span>
+    <div className="flex flex-col w-full bg-[#f1f5f9] p-4">
+      {/* Header */}
+      <div className="bg-[#0F8A69] text-white rounded-xl p-6 shadow-md flex items-center justify-between">
+        <h1 className="text-xl font-semibold">
+          HI, {profile?.firstName} {profile?.lastName}
+        </h1>
+        <span className="opacity-90">
+          {new Date().toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </span>
       </div>
 
       {/* Section Title */}
       <h2 className="mt-6 mb-3 text-lg font-semibold text-[#0F8A69]">
-        Vaccination Alert
+        Upcoming Health Events
       </h2>
 
-      {/* Alert Box */}
-      <div className="bg-white p-6 rounded-xl shadow-md  space-y-4">
-        {/* Event Row */}
-        <div className="bg-[#79B8A9] text-white rounded-lg p-4 flex justify-between items-center">
-          <span className="font-medium">{vaccinationAlert.title}</span>
-          <span className="opacity-90">{vaccinationAlert.location}</span>
-          <span className="opacity-90">{vaccinationAlert.schedule}</span>
-        </div>
+      {/* Event Cards */}
+      <div className="grid gap-4">
+        {events.length === 0 ? (
+          <p className="text-gray-500 text-center py-4">No events available.</p>
+        ) : (
+          events.map((ev) => (
+            <div
+              key={ev.id}
+              className="bg-white p-5 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition"
+            >
+              {/* Event Type */}
+              <div className="text-[#0F8A69] font-bold text-sm uppercase tracking-wide mb-2">
+                {ev.eventType}
+              </div>
 
-        {/* Placeholder second row */}
-        <div className="bg-[#79B8A9] rounded-lg p-4 h-10"></div>
+              {/* Title */}
+              <h3 className="text-lg font-semibold text-gray-800">
+                {ev.title}
+              </h3>
+
+              {/* Location */}
+              <div className="flex items-center mt-2 text-gray-600">
+                <MapPinIcon className="w-5 h-5 mr-2 text-[#0F8A69]" />
+                <span className="font-medium">{ev.location}</span>
+              </div>
+
+              {/* Date */}
+              <div className="flex items-center text-gray-600 mt-1">
+                <CalendarDaysIcon className="w-5 h-5 mr-2 text-[#0F8A69]" />
+                {new Date(ev.date).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+
+              {/* Time */}
+              <div className="flex items-center text-gray-600 mt-1">
+                <ClockIcon className="w-5 h-5 mr-2 text-[#0F8A69]" />
+                {formatTime(ev.startTime)} — {formatTime(ev.endTime)}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

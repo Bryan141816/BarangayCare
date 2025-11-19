@@ -11,6 +11,7 @@ export interface SignupData {
   birthday: string;
   email: string;
   password: string;
+  role: string;
 }
 
 export const registerUser = async (data: SignupData) => {
@@ -26,6 +27,7 @@ export const registerUser = async (data: SignupData) => {
       uid,
       email,
       ...profile,
+      role: "user",
       createdAt: new Date(),
     });
 
