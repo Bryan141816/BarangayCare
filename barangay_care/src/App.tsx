@@ -31,6 +31,8 @@ function App() {
     if (profile) {
       console.log(profile);
       setLoading(false);
+    } else if (profile === null) {
+      setLoading(false);
     }
   }, [profile]);
   return (

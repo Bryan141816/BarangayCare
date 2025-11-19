@@ -39,15 +39,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCurrentUser(user);
 
       if (user) {
-        // Fetch Firestore user profile
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
+        try {
+          const docRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists()) {
-          setProfile(docSnap.data() as FirestoreUser);
+          if (docSnap.exists()) {
+            setProfile(docSnap.data() as FirestoreUser);
+          } else {
+            setProfile(null); // 🔥 Important fallback
+          }
+        } catch (err) {
+          console.error("Error fetching profile:", err);
+          setProfile(null); // 🔥 Always fallback
         }
       } else {
-        setProfile(null);
+        setProfile(null); // 🔥 Ensure profile resets
       }
 
       setLoading(false);
@@ -55,7 +61,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => unsub();
   }, []);
-
   return (
     <AuthContext.Provider value={{ currentUser, profile, loading }}>
       {children}

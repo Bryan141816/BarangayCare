@@ -106,7 +106,10 @@ export default function BookAppointment() {
       }) as Appointment[];
 
       const activeAppointments = list.filter(
-        (a) => a.status !== "closed" && a.requestedBy === currentUser?.uid,
+        (a) =>
+          a.status !== "completed" &&
+          a.status !== "rejected" &&
+          a.requestedBy === currentUser?.uid,
       );
 
       setLatestAppointment(activeAppointments[0] || null);

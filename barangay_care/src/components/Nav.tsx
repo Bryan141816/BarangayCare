@@ -27,7 +27,7 @@ export default function Navbar() {
       icon: <CalendarDaysIcon className="w-5 h-5" />,
     },
     {
-      name: "Health Records",
+      name: "Appointment Records",
       path: "/health-records",
       icon: <HeartIcon className="w-5 h-5" />,
     },

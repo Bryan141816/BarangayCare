@@ -16,6 +16,7 @@ export const createAppointment = async (data: AppointmentData) => {
       status: "waiting for approval",
       location: "", // empty as requested
       createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
     });
 
     return { success: true, id: docRef.id };

@@ -32,13 +32,17 @@ export default function ManageAppointments() {
   const [reason, setReason] = useState("");
 
   // NEW ✔ Action State
-  const [action, setAction] = useState<"" | "approve" | "reject">("");
+
+  const [action, setAction] = useState<
+    "" | "approve" | "reject" | "fail" | "complete"
+  >("");
 
   const statusPriority: Record<Appointment["status"], number> = {
     "waiting for approval": 1,
     approved: 2,
     rejected: 3,
     completed: 4,
+    failed: 5,
   };
 
   useEffect(() => {
@@ -348,7 +352,7 @@ export default function ManageAppointments() {
                         }
 
                         await updateAppointment(selected.id, {
-                          status: "rejected",
+                          status: "failed",
                           rejectionReason: reason,
                         });
 
