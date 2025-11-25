@@ -128,12 +128,17 @@ export default function HealthRecords() {
               </div>
 
               {/* 🔥 Rejection Box */}
-              {appt.status === "rejected" && appt.rejectionReason && (
-                <div className="mt-3 bg-red-50 border border-red-300 text-red-700 p-3 rounded-xl">
-                  <p className="font-semibold">Reason for Rejection:</p>
-                  <p>{appt.rejectionReason}</p>
-                </div>
-              )}
+              {(appt.status === "rejected" || appt.status === "failed") &&
+                appt.rejectionReason && (
+                  <div className="mt-3 bg-red-50 border border-red-300 text-red-700 p-3 rounded-xl">
+                    <p className="font-semibold">
+                      {appt.status === "rejected"
+                        ? "Reason for Rejection:"
+                        : "Reason for Failure:"}
+                    </p>
+                    <p>{appt.rejectionReason}</p>
+                  </div>
+                )}
             </div>
           ))}
         </div>

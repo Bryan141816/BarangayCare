@@ -48,6 +48,11 @@ export default function Navbar() {
       path: "/manage-appointment",
       icon: <PaperClipIcon className="w-5 h-5" />,
     },
+    {
+      name: "Teleconsultation",
+      path: "/admin-teleconsultation",
+      icon: <EnvelopeIcon className="w-5 h-5" />,
+    },
   ];
   const adminItems = [
     {

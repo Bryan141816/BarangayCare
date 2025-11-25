@@ -1,4 +1,3 @@
-// AuthContext.tsx
 import { createContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import type { ReactNode } from "react";
@@ -6,7 +5,9 @@ import type { User } from "firebase/auth";
 import { auth, db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 
-interface FirestoreUser {
+// Firestore user type with UID
+export interface FirestoreUser {
+  uid: string; // Added UID here
   firstName: string;
   lastName: string;
   address: string;
@@ -44,16 +45,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const docSnap = await getDoc(docRef);
 
           if (docSnap.exists()) {
-            setProfile(docSnap.data() as FirestoreUser);
+            setProfile({
+              uid: user.uid, // Include UID here
+              ...(docSnap.data() as Omit<FirestoreUser, "uid">),
+            });
           } else {
-            setProfile(null); // 🔥 Important fallback
+            setProfile(null);
           }
         } catch (err) {
           console.error("Error fetching profile:", err);
-          setProfile(null); // 🔥 Always fallback
+          setProfile(null);
         }
       } else {
-        setProfile(null); // 🔥 Ensure profile resets
+        setProfile(null);
       }
 
       setLoading(false);
@@ -61,6 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => unsub();
   }, []);
+
   return (
     <AuthContext.Provider value={{ currentUser, profile, loading }}>
       {children}
