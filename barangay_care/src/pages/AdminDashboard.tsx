@@ -133,6 +133,7 @@ export default function AdminDashboard() {
             value={heatmapData}
             startDate={new Date(`${new Date().getFullYear()}/01/01`)}
             legendCellSize={0}
+            rectSize={20}
             rectRender={(props, data) => {
               let fillColor = "#e1e4e8"; // gray for 0 counts
               if (data.count > 0 && maxCount > 0) {
