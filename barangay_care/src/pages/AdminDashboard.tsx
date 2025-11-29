@@ -2,20 +2,37 @@ import { useEffect, useState, useRef, useContext } from "react";
 import { AuthContext } from "../provider/AuthProvider";
 import HeatMap from "@uiw/react-heat-map";
 import { CalendarDaysIcon } from "@heroicons/react/24/outline";
+import { collection, getDocs, Timestamp } from "firebase/firestore";
+import { db } from "../../firebase";
 import {
-  collection,
-  query,
-  where,
-  getDocs,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "../../firebase"; // adjust import
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Line, Pie } from "react-chartjs-2";
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+);
 
 interface Teleconsultation {
   id?: string;
   createdAt: Timestamp;
   status: string;
-  // add other fields if needed
 }
 
 interface HeatMapData {
@@ -23,23 +40,43 @@ interface HeatMapData {
   count: number;
 }
 
-// Fetch all closed teleconsultations for admin
-async function getAllClosedTeleconsultations(): Promise<Teleconsultation[]> {
-  const q = query(
-    collection(db, "teleconsultations"),
-    where("status", "==", "closed"),
-  );
-  const snapshot = await getDocs(q);
-  if (!snapshot.empty) {
-    return snapshot.docs.map((doc) => {
-      const { id: _ignored, ...rest } = doc.data() as Teleconsultation;
-      return { id: doc.id, ...rest };
-    });
-  }
-  return [];
+interface EventData {
+  id?: string;
+  createdAt: Timestamp;
 }
 
-// Convert teleconsultations to heatmap data for the full year
+interface AppointmentData {
+  id?: string;
+  status: string;
+}
+
+// Fetch all closed teleconsultations
+async function getAllClosedTeleconsultations(): Promise<Teleconsultation[]> {
+  const snapshot = await getDocs(collection(db, "teleconsultations"));
+  return snapshot.docs
+    .map((doc) => doc.data() as Teleconsultation)
+    .filter((tc) => tc.status === "closed");
+}
+
+// Fetch all events
+async function getAllEvents(): Promise<EventData[]> {
+  const snapshot = await getDocs(collection(db, "events"));
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...(doc.data() as EventData),
+  }));
+}
+
+// Fetch all appointments
+async function getAllAppointments(): Promise<AppointmentData[]> {
+  const snapshot = await getDocs(collection(db, "appointments"));
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...(doc.data() as AppointmentData),
+  }));
+}
+
+// Convert teleconsultations to heatmap data
 function convertToHeatMapData(telecons: Teleconsultation[]): HeatMapData[] {
   const counts: Record<string, number> = {};
   telecons.forEach((tc) => {
@@ -62,29 +99,99 @@ function convertToHeatMapData(telecons: Teleconsultation[]): HeatMapData[] {
   return allDates;
 }
 
-// Admin Dashboard Component
+// Convert events to daily counts for line chart
+function convertEventsToDailyCounts(events: EventData[]) {
+  const counts: Record<string, number> = {};
+  events.forEach((ev) => {
+    const dateStr = ev.createdAt
+      .toDate()
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, "/");
+    counts[dateStr] = (counts[dateStr] || 0) + 1;
+  });
+
+  const sortedDates = Object.keys(counts).sort();
+  const data = sortedDates.map((date) => counts[date]);
+  return { labels: sortedDates, data };
+}
+
+// Convert appointments to status counts for pie chart
+function convertAppointmentsToStatusCounts(appointments: AppointmentData[]) {
+  const statusMap: Record<string, number> = {
+    Pending: 0,
+    Approved: 0,
+    Rejected: 0,
+    Completed: 0,
+    Failed: 0,
+  };
+
+  appointments.forEach((ap) => {
+    switch (ap.status.toLowerCase()) {
+      case "waiting for approval":
+        statusMap.Pending += 1;
+        break;
+      case "approved":
+        statusMap.Approved += 1;
+        break;
+      case "rejected":
+        statusMap.Rejected += 1;
+        break;
+      case "completed":
+        statusMap.Completed += 1;
+        break;
+      case "failed":
+        statusMap.Failed += 1;
+        break;
+      default:
+        break;
+    }
+  });
+
+  return statusMap;
+}
+
 export default function AdminDashboard() {
   const { profile } = useContext(AuthContext);
+
   const [heatmapData, setHeatmapData] = useState<HeatMapData[]>([]);
+  const [eventData, setEventData] = useState<{
+    labels: string[];
+    data: number[];
+  }>({ labels: [], data: [] });
+  const [appointmentStatusCounts, setAppointmentStatusCounts] = useState<
+    Record<string, number>
+  >({
+    Pending: 0,
+    Approved: 0,
+    Rejected: 0,
+    Completed: 0,
+    Failed: 0,
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [heatmapWidth, setHeatmapWidth] = useState(800);
 
   useEffect(() => {
     async function fetchData() {
-      const closedTelecons = await getAllClosedTeleconsultations();
-      const data = convertToHeatMapData(closedTelecons);
-      setHeatmapData(data);
+      const telecons = await getAllClosedTeleconsultations();
+      setHeatmapData(convertToHeatMapData(telecons));
+
+      const events = await getAllEvents();
+      setEventData(convertEventsToDailyCounts(events));
+
+      const appointments = await getAllAppointments();
+      setAppointmentStatusCounts(
+        convertAppointmentsToStatusCounts(appointments),
+      );
     }
     fetchData();
   }, []);
 
-  // Update heatmap width on resize
   useEffect(() => {
     function updateWidth() {
-      if (containerRef.current) {
+      if (containerRef.current)
         setHeatmapWidth(containerRef.current.clientWidth);
-      }
-      console.log(containerRef.current?.clientWidth);
     }
     updateWidth();
     window.addEventListener("resize", updateWidth);
@@ -92,6 +199,54 @@ export default function AdminDashboard() {
   }, []);
 
   const maxCount = Math.max(...heatmapData.map((d) => d.count));
+
+  const lineChartData = {
+    labels: eventData.labels,
+    datasets: [
+      {
+        label: "Events per Day",
+        data: eventData.data,
+        borderColor: "#0F8A69",
+        backgroundColor: "rgba(15, 138, 105, 0.3)",
+        tension: 0.3,
+      },
+    ],
+  };
+
+  const lineChartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: "top" as const },
+      title: { display: true, text: "Daily Events Created" },
+    },
+  };
+
+  const pieChartData = {
+    labels: Object.keys(appointmentStatusCounts),
+    datasets: [
+      {
+        data: Object.values(appointmentStatusCounts),
+        backgroundColor: [
+          "#FBBF24", // Pending
+          "#0F8A69", // Approved
+          "#EF4444", // Rejected
+          "#6366F1", // Completed
+          "#9CA3AF", // Failed
+        ],
+        borderWidth: 1,
+        spacing: 4, // space between slices
+        cutout: "70%",
+      },
+    ],
+  };
+
+  const pieChartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: "right" as const },
+      title: { display: true, text: "Appointments by Status" },
+    },
+  };
 
   return (
     <div className="flex flex-col w-full bg-[#f1f5f9] p-4 min-h-screen">
@@ -108,51 +263,71 @@ export default function AdminDashboard() {
           })}
         </span>
       </div>
+      {/* Events & Appointments Section */}
 
-      {/* Section Title */}
-      <h2 className="mt-6 mb-3 text-lg font-semibold text-[#0F8A69]">
-        Teleconsultation Calendar
-      </h2>
+      <div className="mt-8">
+        <h2 className="mb-3 text-lg font-semibold text-[#0F8A69]">
+          Data Overview
+        </h2>
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 flex flex-col lg:flex-row gap-6">
+          {/* Left: Line Chart */}
+          <div className="flex-1 ">
+            <Line
+              data={lineChartData}
+              options={lineChartOptions}
+              height={100}
+            />
+          </div>
 
-      {/* Calendar Card */}
-      <div
-        ref={containerRef}
-        className="bg-white rounded-xl shadow-md border border-gray-200 p-6 overflow-x-auto"
-      >
-        <div className="flex items-center space-x-2 mb-4">
-          <CalendarDaysIcon className="w-6 h-6 text-[#0F8A69]" />
-          <h3 className="text-gray-800 text-lg font-semibold">
-            Consultation Activity Overview
-          </h3>
+          <div className="flex-1 h-64 flex justify-center items-center">
+            <Pie data={pieChartData} options={pieChartOptions} />
+          </div>
         </div>
+      </div>
 
-        {/* Heat Map */}
-        <div className="flex justify-center overflow-x-auto p-4">
-          <HeatMap
-            width={heatmapWidth}
-            value={heatmapData}
-            startDate={new Date(`${new Date().getFullYear()}/01/01`)}
-            legendCellSize={0}
-            rectSize={20}
-            rectRender={(props, data) => {
-              let fillColor = "#e1e4e8"; // gray for 0 counts
-              if (data.count > 0 && maxCount > 0) {
-                const intensity = Math.min(
-                  0.1 + (data.count / maxCount) * 0.9,
-                  1,
+      {/* Teleconsultation Calendar Section */}
+      <div className="mt-6">
+        <h2 className="mb-3 text-lg font-semibold text-[#0F8A69]">
+          Teleconsultation Calendar
+        </h2>
+        <div
+          ref={containerRef}
+          className="bg-white rounded-xl shadow-md border border-gray-200 p-6 overflow-x-auto"
+        >
+          <div className="flex items-center space-x-2 mb-4">
+            <CalendarDaysIcon className="w-6 h-6 text-[#0F8A69]" />
+            <h3 className="text-gray-800 text-lg font-semibold">
+              Consultation Activity Overview
+            </h3>
+          </div>
+
+          <div className="flex justify-center overflow-x-auto p-4">
+            <HeatMap
+              width={heatmapWidth}
+              value={heatmapData}
+              startDate={new Date(`${new Date().getFullYear()}/01/01`)}
+              legendCellSize={0}
+              rectSize={20}
+              rectRender={(props, data) => {
+                let fillColor = "#e1e4e8";
+                if (data.count > 0 && maxCount > 0) {
+                  const intensity = Math.min(
+                    0.1 + (data.count / maxCount) * 0.9,
+                    1,
+                  );
+                  fillColor = `rgba(0, 128, 0, ${intensity})`;
+                }
+                return (
+                  <rect {...props} fill={fillColor}>
+                    <title>
+                      {data.count} Teleconsultation{data.count !== 1 ? "s" : ""}{" "}
+                      completed
+                    </title>
+                  </rect>
                 );
-                fillColor = `rgba(0, 128, 0, ${intensity})`;
-              }
-              return (
-                <rect {...props} fill={fillColor}>
-                  <title>
-                    {data.count} Teleconsultation
-                    {data.count !== 1 ? "s" : ""} completed
-                  </title>
-                </rect>
-              );
-            }}
-          />
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>
