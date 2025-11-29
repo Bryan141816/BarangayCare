@@ -6,6 +6,7 @@ import {
 } from "../service/teleconsultation_admin";
 import type { TeleSession } from "../service/teleconsultation_admin";
 
+import { Link } from "react-router-dom";
 import { getUserProfile, type UserProfile } from "../service/users";
 
 interface AdminTeleconsultationProps {
@@ -41,13 +42,26 @@ export default function AdminTeleconsultation({
   }
 
   useEffect(() => {
+    // Build today's date in YYYYMMDD format
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const todayIdPrefix = `${yyyy}${mm}${dd}`; // e.g. "20251127"
+
     const unsub1 = listenOpenSessions(async (sessions) => {
-      const enriched = await attachUsers(sessions);
+      const todaySessions = sessions.filter((s) =>
+        String(s.id).startsWith(todayIdPrefix),
+      );
+      const enriched = await attachUsers(todaySessions);
       setOpenSessions(enriched);
     });
 
     const unsub2 = listenResponderSessions(userId, async (sessions) => {
-      const enriched = await attachUsers(sessions);
+      const todaySessions = sessions.filter((s) =>
+        String(s.id).startsWith(todayIdPrefix),
+      );
+      const enriched = await attachUsers(todaySessions);
       setMySessions(enriched);
     });
 
@@ -111,12 +125,12 @@ export default function AdminTeleconsultation({
               <strong>Type:</strong> {s.type || "N/A"}
             </p>
 
-            <a
-              href={`/teleconsultation/${s.id}`}
+            <Link
+              to={`/admin-chat/${s.id}`}
               className="mt-3 block bg-blue-600 text-white py-2 px-4 rounded-lg text-center"
             >
               Open Chat
-            </a>
+            </Link>
           </div>
         ))}
       </div>

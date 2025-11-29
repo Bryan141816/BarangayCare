@@ -6,7 +6,6 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthContext } from "./provider/AuthProvider";
-
 const ProtectedRoute = lazy(() => import("./components/ProtectedRoute"));
 const MainLayout = lazy(() => import("./layout/Mainlayout"));
 const Home = lazy(() => import("./pages/Home"));
@@ -20,6 +19,7 @@ const ManageUsers = lazy(() => import("./pages/ManageUsers"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
 const CreateEvent = lazy(() => import("./pages/CreateEvent"));
+const AdminChat = lazy(() => import("./pages/AdminChat"));
 const ManageAppointment = lazy(() => import("./pages/ManageAppointments"));
 
 const Loader = () => (
@@ -99,6 +99,16 @@ function App() {
                 element={<div>Loading user...</div>}
               />
             )}
+
+            {profile?.uid ? (
+              <Route path="admin-chat/:sessionId" element={<AdminChat />} />
+            ) : (
+              <Route
+                path="admin-chat/:sessionId"
+                element={<div>Loading user...</div>}
+              />
+            )}
+
             <Route path="manage-users" element={<ManageUsers />} />
           </Route>
         </Routes>
