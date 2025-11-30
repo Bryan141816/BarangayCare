@@ -1,8 +1,12 @@
 import { useEffect, useState, useRef, useContext } from "react";
 import { AuthContext } from "../provider/AuthProvider";
 import HeatMap from "@uiw/react-heat-map";
-import { CalendarDaysIcon } from "@heroicons/react/24/outline";
-import { collection, getDocs, Timestamp } from "firebase/firestore";
+import {
+  CalendarDaysIcon,
+  MapPinIcon,
+  ClockIcon,
+} from "@heroicons/react/24/outline";
+import { collection, getDocs, Timestamp, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
   Chart as ChartJS,
@@ -43,6 +47,16 @@ interface HeatMapData {
 interface EventData {
   id?: string;
   createdAt: Timestamp;
+}
+
+interface EventDataFull {
+  id: string;
+  eventType: string;
+  title: string;
+  location: string;
+  date: string;
+  startTime: string;
+  endTime: string;
 }
 
 interface AppointmentData {
@@ -171,6 +185,39 @@ export default function AdminDashboard() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [heatmapWidth, setHeatmapWidth] = useState(800);
+
+  const [events, setEvents] = useState<EventDataFull[]>([]);
+
+  const formatTime = (hourString: string) => {
+    const hour = Number(hourString);
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const formatted = hour % 12 === 0 ? 12 : hour % 12;
+    return `${formatted}:00 ${suffix}`;
+  };
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "events"), (snapshot) => {
+      const list = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as EventDataFull[];
+
+      // Filter: only show events that are TODAY or in the FUTURE
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // normalize
+
+      const filtered = list.filter((ev) => {
+        const evDate = new Date(ev.date);
+        evDate.setHours(0, 0, 0, 0);
+
+        return evDate >= today; // keep only upcoming events
+      });
+
+      setEvents(filtered);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -329,6 +376,55 @@ export default function AdminDashboard() {
             />
           </div>
         </div>
+      </div>
+      <h2 className="mt-6 mb-3 text-lg font-semibold text-[#0F8A69]">
+        Upcoming Health Events
+      </h2>
+
+      {/* Event Cards */}
+      <div className="grid gap-4">
+        {events.length === 0 ? (
+          <p className="text-gray-500 text-center py-4">No events available.</p>
+        ) : (
+          events.map((ev) => (
+            <div
+              key={ev.id}
+              className="bg-white p-5 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition"
+            >
+              {/* Event Type */}
+              <div className="text-[#0F8A69] font-bold text-sm uppercase tracking-wide mb-2">
+                {ev.eventType}
+              </div>
+
+              {/* Title */}
+              <h3 className="text-lg font-semibold text-gray-800">
+                {ev.title}
+              </h3>
+
+              {/* Location */}
+              <div className="flex items-center mt-2 text-gray-600">
+                <MapPinIcon className="w-5 h-5 mr-2 text-[#0F8A69]" />
+                <span className="font-medium">{ev.location}</span>
+              </div>
+
+              {/* Date */}
+              <div className="flex items-center text-gray-600 mt-1">
+                <CalendarDaysIcon className="w-5 h-5 mr-2 text-[#0F8A69]" />
+                {new Date(ev.date).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </div>
+
+              {/* Time */}
+              <div className="flex items-center text-gray-600 mt-1">
+                <ClockIcon className="w-5 h-5 mr-2 text-[#0F8A69]" />
+                {formatTime(ev.startTime)} — {formatTime(ev.endTime)}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
