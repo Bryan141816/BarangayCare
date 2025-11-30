@@ -20,8 +20,9 @@ const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
 const CreateEvent = lazy(() => import("./pages/CreateEvent"));
 const AdminChat = lazy(() => import("./pages/AdminChat"));
+const ManageEvents = lazy(() => import("./pages/ManageEvents"));
 const ManageAppointment = lazy(() => import("./pages/ManageAppointments"));
-const AdminDashboard = lazy(()=>import("./pages/AdminDashboard"))
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const Loader = () => (
   <div className="flex items-center justify-center min-h-screen">
     <div className="w-10 h-10 border-4 border-t-green-500 border-gray-300 rounded-full animate-spin"></div>
@@ -86,7 +87,8 @@ function App() {
             )}
 
             {/* Only superadmin should access this – optional protection */}
-            <Route path="dashboard" element={<AdminDashboard />}/>
+            <Route path="manage-events" element={<ManageEvents />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="create-event" element={<CreateEvent />} />
             <Route path="manage-appointment" element={<ManageAppointment />} />
             {profile?.uid ? (

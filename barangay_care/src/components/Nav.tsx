@@ -11,7 +11,6 @@ import {
   CalendarIcon,
   PaperClipIcon,
 } from "@heroicons/react/24/outline";
-import path from "path";
 
 export default function Navbar() {
   const location = useLocation();
@@ -40,13 +39,18 @@ export default function Navbar() {
   ];
   const barangayItems = [
     {
-        name: "Dashboard",
-        path: "/dashboard",
-        icon: <HomeIcon className="w-5 h-5" />
+      name: "Dashboard",
+      path: "/dashboard",
+      icon: <HomeIcon className="w-5 h-5" />,
     },
     {
       name: "Create Event",
       path: "/create-event",
+      icon: <CalendarIcon className="w-5 h-5" />,
+    },
+    {
+      name: "Manage Event",
+      path: "/manage-events",
       icon: <CalendarIcon className="w-5 h-5" />,
     },
     {
