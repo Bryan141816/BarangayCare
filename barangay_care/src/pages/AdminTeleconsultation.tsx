@@ -3,6 +3,7 @@ import {
   listenOpenSessions,
   listenResponderSessions,
   claimSession,
+  getClosedSessionsForAdmin,
 } from "../service/teleconsultation_admin";
 import type { TeleSession } from "../service/teleconsultation_admin";
 
@@ -22,33 +23,30 @@ export default function AdminTeleconsultation({
 }: AdminTeleconsultationProps) {
   const [openSessions, setOpenSessions] = useState<SessionWithUser[]>([]);
   const [mySessions, setMySessions] = useState<SessionWithUser[]>([]);
+  const [closedSessions, setClosedSessions] = useState<SessionWithUser[]>([]);
 
   // Helper: Attach user profile to sessions
-
   async function attachUsers(
     sessions: TeleSession[],
   ): Promise<SessionWithUser[]> {
     const results = await Promise.all(
       sessions.map(async (s) => {
         const uid = (s as any).user_id || (s as any).userId;
-
         const user = uid ? await getUserProfile(uid) : null;
-
         return { ...s, user };
       }),
     );
-
     return results;
   }
 
   useEffect(() => {
-    // Build today's date in YYYYMMDD format
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
-    const todayIdPrefix = `${yyyy}${mm}${dd}`; // e.g. "20251127"
+    const todayIdPrefix = `${yyyy}${mm}${dd}`;
 
+    // Listen for open sessions
     const unsub1 = listenOpenSessions(async (sessions) => {
       const todaySessions = sessions.filter((s) =>
         String(s.id).startsWith(todayIdPrefix),
@@ -57,6 +55,7 @@ export default function AdminTeleconsultation({
       setOpenSessions(enriched);
     });
 
+    // Listen for sessions assigned to me
     const unsub2 = listenResponderSessions(userId, async (sessions) => {
       const todaySessions = sessions.filter((s) =>
         String(s.id).startsWith(todayIdPrefix),
@@ -64,6 +63,14 @@ export default function AdminTeleconsultation({
       const enriched = await attachUsers(todaySessions);
       setMySessions(enriched);
     });
+
+    // Fetch closed sessions
+    const fetchClosed = async () => {
+      const closed = await getClosedSessionsForAdmin(userId);
+      const enriched = await attachUsers(closed);
+      setClosedSessions(enriched);
+    };
+    fetchClosed();
 
     return () => {
       unsub1?.();
@@ -79,23 +86,19 @@ export default function AdminTeleconsultation({
 
       {/* Open Sessions */}
       <h2 className="text-lg font-medium mb-3">Unassigned Sessions</h2>
-
       <div className="space-y-3">
         {openSessions.length === 0 && (
           <p className="text-gray-500">No unassigned sessions.</p>
         )}
-
         {openSessions.map((s) => (
           <div key={s.id} className="border p-4 rounded-lg">
             <p>
               <strong>User:</strong>{" "}
               {s.user ? `${s.user.firstName} ${s.user.lastName}` : s.user_id}
             </p>
-
             <p>
               <strong>Type:</strong> {s.type || "N/A"}
             </p>
-
             <button
               onClick={() => claimSession(s.id, userId)}
               className="mt-3 bg-[#0F8A69] text-white py-2 px-4 rounded-lg"
@@ -108,28 +111,51 @@ export default function AdminTeleconsultation({
 
       {/* My Active Sessions */}
       <h2 className="text-lg font-medium mt-8 mb-3">My Active Sessions</h2>
-
       <div className="space-y-3">
         {mySessions.length === 0 && (
           <p className="text-gray-500">You don't have active sessions.</p>
         )}
-
         {mySessions.map((s) => (
           <div key={s.id} className="border p-4 rounded-lg">
             <p>
               <strong>User:</strong>{" "}
               {s.user ? `${s.user.firstName} ${s.user.lastName}` : s.user_id}
             </p>
-
             <p>
               <strong>Type:</strong> {s.type || "N/A"}
             </p>
-
             <Link
               to={`/admin-chat/${s.id}`}
               className="mt-3 block bg-blue-600 text-white py-2 px-4 rounded-lg text-center"
             >
               Open Chat
+            </Link>
+          </div>
+        ))}
+      </div>
+
+      {/* Closed Sessions (History) */}
+      <h2 className="text-lg font-medium mt-8 mb-3">
+        Closed Sessions (History)
+      </h2>
+      <div className="space-y-3">
+        {closedSessions.length === 0 && (
+          <p className="text-gray-500">No closed sessions yet.</p>
+        )}
+        {closedSessions.map((s) => (
+          <div key={s.id} className="border p-4 rounded-lg">
+            <p>
+              <strong>User:</strong>{" "}
+              {s.user ? `${s.user.firstName} ${s.user.lastName}` : s.user_id}
+            </p>
+            <p>
+              <strong>Type:</strong> {s.type || "N/A"}
+            </p>
+            <Link
+              to={`/admin-chat/${s.id}`}
+              className="mt-3 block bg-gray-600 text-white py-2 px-4 rounded-lg text-center"
+            >
+              View Chat
             </Link>
           </div>
         ))}

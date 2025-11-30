@@ -1,4 +1,3 @@
-
 import { db } from "../../firebase";
 import {
   collection,
@@ -11,6 +10,7 @@ import {
   orderBy,
   getDoc,
   serverTimestamp,
+  getDocs,
 } from "firebase/firestore";
 
 // Import the REAL Message interface so types match
@@ -38,7 +38,7 @@ export function listenOpenSessions(callback: SessionCallback) {
   const q = query(
     collection(db, "teleconsultations"),
     where("status", "==", "open"),
-    where("responder_id", "==", null)
+    where("responder_id", "==", null),
   );
 
   return onSnapshot(q, (snap) => {
@@ -55,12 +55,12 @@ export function listenOpenSessions(callback: SessionCallback) {
 // -----------------------------
 export function listenResponderSessions(
   adminId: string,
-  callback: SessionCallback
+  callback: SessionCallback,
 ) {
   const q = query(
     collection(db, "teleconsultations"),
     where("responder_id", "==", adminId),
-    where("status", "==", "active")
+    where("status", "==", "active"),
   );
 
   return onSnapshot(q, (snap) => {
@@ -77,11 +77,11 @@ export function listenResponderSessions(
 // -----------------------------
 export function listenToMessages(
   sessionId: string,
-  callback: (messages: Message[]) => void
+  callback: (messages: Message[]) => void,
 ) {
   const q = query(
     collection(db, "teleconsultations", sessionId, "messages"),
-    orderBy("timestamp", "asc")
+    orderBy("timestamp", "asc"),
   );
 
   return onSnapshot(q, (snap) => {
@@ -93,7 +93,9 @@ export function listenToMessages(
     callback(messages);
   });
 }
-export async function getSessionStatus(sessionId: string): Promise<"open" | "active" | "closed" | null> {
+export async function getSessionStatus(
+  sessionId: string,
+): Promise<"open" | "active" | "closed" | null> {
   try {
     const docRef = doc(db, "teleconsultations", sessionId);
     const docSnap = await getDoc(docRef);
@@ -113,7 +115,7 @@ export async function getSessionStatus(sessionId: string): Promise<"open" | "act
 // -----------------------------
 export function listenSessionStatus(
   sessionId: string,
-  callback: (status: "open" | "active" | "closed" | null) => void
+  callback: (status: "open" | "active" | "closed" | null) => void,
 ) {
   const docRef = doc(db, "teleconsultations", sessionId);
 
@@ -134,13 +136,13 @@ export function listenSessionStatus(
 // -----------------------------
 export async function sendDoctorMessage(
   sessionId: string,
-  text: string
+  text: string,
 ): Promise<void> {
   const messagesRef = collection(
     db,
     "teleconsultations",
     sessionId,
-    "messages"
+    "messages",
   );
 
   await addDoc(messagesRef, {
@@ -160,3 +162,24 @@ export async function claimSession(sessionId: string, adminId: string) {
   });
 }
 
+// -----------------------------
+// Get all closed sessions assigned to a specific admin
+// -----------------------------
+export async function getClosedSessionsForAdmin(
+  adminId: string,
+): Promise<TeleSession[]> {
+  const q = query(
+    collection(db, "teleconsultations"),
+    where("status", "==", "closed"),
+    where("responder_id", "==", adminId),
+  );
+
+  const snap = await getDocs(q);
+
+  if (snap.empty) return [];
+
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+  })) as TeleSession[];
+}

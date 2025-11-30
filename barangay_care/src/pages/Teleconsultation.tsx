@@ -12,6 +12,7 @@ import {
   query,
   where,
   getDocs,
+  orderBy,
   Timestamp,
 } from "firebase/firestore";
 import {
@@ -27,6 +28,7 @@ export interface TeleconsultationProps {
   userId: string;
 }
 
+// ------------------ Fetch today's open/active session ------------------
 export async function getTodaySession(userId: string) {
   const startOfDay = Timestamp.fromDate(
     new Date(new Date().setHours(0, 0, 0, 0)),
@@ -51,6 +53,23 @@ export async function getTodaySession(userId: string) {
   return null;
 }
 
+// ------------------ Fetch closed sessions ------------------
+export async function getClosedSessions(userId: string) {
+  const q = query(
+    collection(db, "teleconsultations"),
+    where("userId", "==", userId),
+    where("status", "==", "closed"),
+    orderBy("createdAt", "desc"),
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as { id: string; type?: ConsultationType; createdAt: Timestamp }[];
+}
+
+// ------------------ Component ------------------
 export default function Teleconsultation({ userId }: TeleconsultationProps) {
   const [selectedType, setSelectedType] = useState<ConsultationType>("General");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -58,6 +77,12 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [disabled, setDisabled] = useState(false);
+
+  const [closedSessions, setClosedSessions] = useState<
+    { id: string; type?: ConsultationType; createdAt: Timestamp }[]
+  >([]);
+
+  const [viewingClosedSession, setViewingClosedSession] = useState(false);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -68,17 +93,24 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
     { name: "Symptom Advice", icon: <SparklesIcon className="w-6 h-6" /> },
   ];
 
-  // ------------------ Fetch today's session ------------------
+  // ------------------ Fetch sessions ------------------
   useEffect(() => {
     async function fetchSession() {
-      const session = await getTodaySession(userId);
-      if (session) {
-        setSessionId(session.id);
-        setStatus(session.status);
-        setSelectedType(session.type || "General");
-      } else {
-        setStatus("closed");
-        setSelectedType("General");
+      try {
+        const session = await getTodaySession(userId);
+        if (session) {
+          setSessionId(session.id);
+          setStatus(session.status);
+          setSelectedType(session.type || "General");
+        } else {
+          setStatus("closed");
+          setSelectedType("General");
+        }
+
+        const closed = await getClosedSessions(userId);
+        setClosedSessions(closed);
+      } catch (err) {
+        console.error("Failed to fetch sessions:", err);
       }
     }
     fetchSession();
@@ -86,10 +118,10 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
 
   // Listen to messages
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || viewingClosedSession) return;
     const unsubscribe = listenToMessages(sessionId, setMessages);
     return () => unsubscribe();
-  }, [sessionId]);
+  }, [sessionId, viewingClosedSession]);
 
   // Auto-scroll
   useEffect(() => {
@@ -131,13 +163,11 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
       setMessage("");
 
       const botAlreadyReplied = messages.some((msg) => msg.sender === "bot");
-
       if (!botAlreadyReplied) {
         setTimeout(async () => {
           try {
             await sendBotReply(
               sessionId,
-
               "Thanks for your message. Our support personnel will assist you shortly.",
             );
           } catch (err) {
@@ -156,103 +186,68 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
   };
 
   const handleCancel = async () => {
-    if (sessionId) await updateSessionStatus(sessionId, "closed");
+    if (sessionId && !viewingClosedSession)
+      await updateSessionStatus(sessionId, "closed");
     setSessionId(null);
     setMessages([]);
     setMessage("");
     setStatus("closed");
     setSelectedType("General");
+    setViewingClosedSession(false);
     setDisabled(false);
+  };
+
+  const handleViewClosedSession = async (id: string) => {
+    setSessionId(id);
+    setViewingClosedSession(true);
+    setStatus("closed"); // read-only
+    const snapshot = await getDocs(
+      collection(db, "teleconsultations", id, "messages"),
+    );
+    setMessages(
+      snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          sender: data.sender ?? "user",
+          text: data.text ?? "",
+          timestamp: data.timestamp ?? null,
+        } as Message;
+      }),
+    );
+  };
+
+  const handleBack = () => {
+    // Go back to list of closed sessions
+    setSessionId(null);
+    setMessages([]);
+    setViewingClosedSession(false);
+    setStatus("closed");
   };
 
   // ------------------ Render ------------------
   return (
     <div className="flex flex-1 h-full flex-col">
-      <h1 className="text-xl font-semibold text-[#0F8A69] mb-6">
-        Teleconsultation
-      </h1>
-
-      {/* Chat messages */}
-      {(status === "open" || status === "active") && (
-        <div className="flex flex-col flex-1 min-h-0 mb-4">
-          <div
-            ref={chatContainerRef}
-            className="flex-1 bg-white rounded-xl shadow-md p-6 space-y-4 overflow-y-auto"
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-semibold text-[#0F8A69]">
+          Teleconsultation
+        </h1>
+        {viewingClosedSession && (
+          <button
+            onClick={handleBack}
+            className="text-[#0F8A69] hover:text-[#0c7356] font-medium"
           >
-            {messages.map((msg) => (
-              <div key={msg.id}>
-                <div
-                  className={`flex ${
-                    msg.sender === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`p-4 rounded-xl max-w-xs break-words whitespace-pre-wrap ${
-                      msg.sender === "user"
-                        ? "bg-[#0F8A69] text-white"
-                        : msg.sender === "doctor"
-                          ? "bg-blue-200 text-blue-900"
-                          : "bg-gray-200 text-gray-700"
-                    }`}
-                  >
-                    {msg.text}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Chat input */}
-          <div className="relative flex items-center space-x-3 pt-4 shrink-0">
-            <textarea
-              ref={chatInputRef}
-              placeholder="Write a message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey &&
-                  !disabled &&
-                  message.trim()
-                ) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              rows={1}
-              style={{ resize: "none", overflow: "auto", maxHeight: "6rem" }}
-              className="flex-1 border rounded-lg p-3 outline-none focus:ring-2 focus:ring-[#0F8A69]"
-            />
-
-            <button
-              onClick={handleSend}
-              disabled={disabled || !message.trim()}
-              className={`bg-[#0F8A69] p-3 rounded-lg text-white hover:bg-[#0c7356] ${
-                disabled || !message.trim()
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
-              }`}
-            >
-              <PaperAirplaneIcon className="w-6 h-6 rotate-45" />
-            </button>
-
-            <button
-              onClick={handleCancel}
-              className="bg-red-500 p-3 rounded-lg text-white hover:bg-red-600"
-            >
-              End Session
-            </button>
-          </div>
-        </div>
-      )}
+            ← Back
+          </button>
+        )}
+      </div>
 
       {/* Consultation type selection + Start button */}
-      {status === "closed" && !sessionId && (
+      {status === "closed" && !sessionId && !viewingClosedSession && (
         <div>
-          <h1 className="text-xl font-semibold text-[#0F8A69] mb-6">
+          <h2 className="text-lg font-semibold text-[#0F8A69] mb-4">
             Select Consultation Type
-          </h1>
+          </h2>
           <div className="grid grid-cols-3 gap-4 mb-4">
             {consultationTypes.map((item) => (
               <button
@@ -274,6 +269,116 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
           >
             Start Teleconsultation
           </button>
+
+          {/* Closed sessions */}
+
+          {/* Closed sessions */}
+          <div className="mt-6">
+            <h2 className="text-lg font-medium mb-2">Past Sessions</h2>
+            {closedSessions.length === 0 && (
+              <p className="text-gray-500">No past sessions.</p>
+            )}
+            <div className="space-y-3">
+              {closedSessions.map((s) => {
+                const createdAtDate = s.createdAt?.toDate
+                  ? s.createdAt.toDate()
+                  : new Date();
+                const formattedDate = createdAtDate.toLocaleString(); // you can format as needed
+
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => handleViewClosedSession(s.id)}
+                    className="w-full text-left border p-3 rounded-lg hover:bg-gray-100"
+                  >
+                    <div className="flex justify-between">
+                      <span>
+                        {s.type || "General"} - {s.id.slice(-6)}
+                      </span>
+                      <span className="text-gray-500 text-sm">
+                        {formattedDate}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chat messages */}
+      {(status === "open" || status === "active" || sessionId) && (
+        <div className="flex flex-col flex-1 min-h-0 mb-4">
+          <div
+            ref={chatContainerRef}
+            className="flex-1 bg-white rounded-xl shadow-md p-6 space-y-4 overflow-y-auto"
+          >
+            {messages.map((msg) => (
+              <div key={msg.id}>
+                <div
+                  className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`p-4 rounded-xl max-w-xs break-words whitespace-pre-wrap ${
+                      msg.sender === "user"
+                        ? "bg-[#0F8A69] text-white"
+                        : msg.sender === "doctor"
+                          ? "bg-blue-200 text-blue-900"
+                          : "bg-gray-200 text-gray-700"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Chat input */}
+          {status !== "closed" && !viewingClosedSession && (
+            <div className="relative flex items-center space-x-3 pt-4 shrink-0">
+              <textarea
+                ref={chatInputRef}
+                placeholder="Write a message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === "Enter" &&
+                    !e.shiftKey &&
+                    !disabled &&
+                    message.trim()
+                  ) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                rows={1}
+                style={{ resize: "none", overflow: "auto", maxHeight: "6rem" }}
+                className="flex-1 border rounded-lg p-3 outline-none focus:ring-2 focus:ring-[#0F8A69]"
+              />
+
+              <button
+                onClick={handleSend}
+                disabled={disabled || !message.trim()}
+                className={`bg-[#0F8A69] p-3 rounded-lg text-white hover:bg-[#0c7356] ${
+                  disabled || !message.trim()
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
+                }`}
+              >
+                <PaperAirplaneIcon className="w-6 h-6 rotate-45" />
+              </button>
+
+              <button
+                onClick={handleCancel}
+                className="bg-red-500 p-3 rounded-lg text-white hover:bg-red-600"
+              >
+                End Session
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
