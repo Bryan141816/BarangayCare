@@ -215,6 +215,7 @@ export default function AdminTeleconsultation({
                 className={`px-4 py-2 rounded-lg bg-[#0F8A69] text-white hover:bg-[#0c7356] ${
                   isClaiming ? "cursor-not-allowed opacity-50" : ""
                 }`}
+                disabled={isClaiming}
               >
                 {isClaiming ? "Claiming..." : "Confirm"}
               </button>

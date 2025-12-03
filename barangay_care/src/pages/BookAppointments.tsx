@@ -240,6 +240,7 @@ export default function BookAppointment() {
               <button
                 onClick={handleSubmit}
                 className="px-4 py-2 rounded-lg bg-[#0F8A69] text-white hover:bg-[#0c7356] transition"
+                disabled={isLoading}
               >
                 {isLoading ? "Submitting..." : "Confirm"}
               </button>
