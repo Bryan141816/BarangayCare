@@ -81,8 +81,13 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
   const [closedSessions, setClosedSessions] = useState<
     { id: string; type?: ConsultationType; createdAt: Timestamp }[]
   >([]);
-
   const [viewingClosedSession, setViewingClosedSession] = useState(false);
+
+  // Confirmation modal
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"start" | "end" | null>(
+    null,
+  );
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -151,6 +156,28 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
       console.error("Failed to create session:", err);
     } finally {
       setDisabled(false);
+      setConfirmOpen(false);
+      setConfirmAction(null);
+    }
+  };
+
+  const handleEndSession = async () => {
+    if (!sessionId) return;
+    setDisabled(true);
+    try {
+      await updateSessionStatus(sessionId, "closed");
+      setSessionId(null);
+      setMessages([]);
+      setMessage("");
+      setStatus("closed");
+      setSelectedType("General");
+      setViewingClosedSession(false);
+    } catch (err) {
+      console.error("Failed to end session:", err);
+    } finally {
+      setDisabled(false);
+      setConfirmOpen(false);
+      setConfirmAction(null);
     }
   };
 
@@ -185,18 +212,6 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
     }
   };
 
-  const handleCancel = async () => {
-    if (sessionId && !viewingClosedSession)
-      await updateSessionStatus(sessionId, "closed");
-    setSessionId(null);
-    setMessages([]);
-    setMessage("");
-    setStatus("closed");
-    setSelectedType("General");
-    setViewingClosedSession(false);
-    setDisabled(false);
-  };
-
   const handleViewClosedSession = async (id: string) => {
     setSessionId(id);
     setViewingClosedSession(true);
@@ -218,11 +233,15 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
   };
 
   const handleBack = () => {
-    // Go back to list of closed sessions
     setSessionId(null);
     setMessages([]);
     setViewingClosedSession(false);
     setStatus("closed");
+  };
+
+  const openConfirmModal = (action: "start" | "end") => {
+    setConfirmAction(action);
+    setConfirmOpen(true);
   };
 
   // ------------------ Render ------------------
@@ -263,14 +282,12 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
           </div>
 
           <button
-            onClick={handleStartSession}
+            onClick={() => openConfirmModal("start")}
             disabled={disabled}
             className="w-full bg-[#0F8A69] text-white py-3 rounded-lg font-medium hover:bg-[#0c7356] disabled:opacity-50"
           >
             Start Teleconsultation
           </button>
-
-          {/* Closed sessions */}
 
           {/* Closed sessions */}
           <div className="mt-6">
@@ -283,7 +300,7 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
                 const createdAtDate = s.createdAt?.toDate
                   ? s.createdAt.toDate()
                   : new Date();
-                const formattedDate = createdAtDate.toLocaleString(); // you can format as needed
+                const formattedDate = createdAtDate.toLocaleString();
 
                 return (
                   <button
@@ -372,13 +389,51 @@ export default function Teleconsultation({ userId }: TeleconsultationProps) {
               </button>
 
               <button
-                onClick={handleCancel}
+                onClick={() => openConfirmModal("end")}
                 className="bg-red-500 p-3 rounded-lg text-white hover:bg-red-600"
               >
                 End Session
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ------------------ CONFIRMATION MODAL ------------------ */}
+      {confirmOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white w-full max-w-sm p-6 rounded-xl shadow-lg">
+            <h2 className="text-lg font-semibold mb-4">
+              {confirmAction === "start"
+                ? "Start Teleconsultation"
+                : "End Session"}
+            </h2>
+            <p className="mb-6 text-gray-700">
+              {confirmAction === "start"
+                ? "Are you sure you want to start a new teleconsultation?"
+                : "Are you sure you want to end this session? You won't be able to send messages after ending."}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
+                disabled={disabled}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={
+                  confirmAction === "start"
+                    ? handleStartSession
+                    : handleEndSession
+                }
+                className="px-4 py-2 rounded-lg bg-[#0F8A69] text-white hover:bg-[#0c7356]"
+                disabled={disabled}
+              >
+                {disabled ? "Processing..." : "Confirm"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

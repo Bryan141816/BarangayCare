@@ -14,7 +14,7 @@ import {
 
 export default function Navbar() {
   const location = useLocation();
-  const { currentUser, profile } = useContext(AuthContext);
+  const { profile } = useContext(AuthContext);
 
   // Extract the role safely
   const role = profile?.role;

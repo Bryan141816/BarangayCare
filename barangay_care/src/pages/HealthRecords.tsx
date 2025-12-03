@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../provider/AuthProvider";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -58,10 +58,14 @@ export default function HealthRecords() {
 
     const unsub = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs
-        .map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Appointment),
-        }))
+        .map((doc) => {
+          const data = doc.data() as Appointment;
+          const { id, ...rest } = data; // remove id from the document data
+          return {
+            id: doc.id, // Firestore document ID
+            ...rest,
+          };
+        })
         .filter((a) => a.requestedBy === currentUser.uid); // Only user’s records
 
       setAppointments(list);

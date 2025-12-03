@@ -1,6 +1,11 @@
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  signOut,
+} from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from "../../firebase"
+import { auth, db } from "../../firebase";
 
 export interface SignupData {
   firstName: string;
@@ -18,11 +23,18 @@ export const registerUser = async (data: SignupData) => {
   try {
     const { email, password, ...profile } = data;
 
-    // 1. Create user in Firebase Auth
-    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    // 1️⃣ Create user in Firebase Auth
+    const userCred = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password,
+    );
     const uid = userCred.user.uid;
 
-    // 2. Create user document in Firestore
+    // 2️⃣ Send email verification
+    await sendEmailVerification(userCred.user);
+
+    // 3️⃣ Create user document in Firestore
     await setDoc(doc(db, "users", uid), {
       uid,
       email,
@@ -41,10 +53,23 @@ export const registerUser = async (data: SignupData) => {
 export const loginUser = async (email: string, password: string) => {
   try {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCred.user;
+
+    if (!user.emailVerified) {
+      // Optionally, you could also send another verification email
+      // await sendEmailVerification(user);
+
+      return {
+        success: false,
+        error: "Email not verified. Please check your inbox.",
+        emailVerified: false,
+      };
+    }
 
     return {
       success: true,
-      user: userCred.user,
+      user,
+      emailVerified: true,
     };
   } catch (error: any) {
     return {
@@ -52,7 +77,7 @@ export const loginUser = async (email: string, password: string) => {
       error: error.message || "Login failed",
     };
   }
-}
+};
 
 export const logoutUser = async () => {
   try {

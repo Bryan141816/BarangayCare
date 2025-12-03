@@ -37,6 +37,12 @@ export default function ManageEvents() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
 
+  // Confirmation modal states
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<
+    "update" | "delete" | null
+  >(null);
+
   // Form values inside modal
   const [eventType, setEventType] = useState("");
   const [title, setTitle] = useState("");
@@ -45,6 +51,7 @@ export default function ManageEvents() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [endTimeOptions, setEndTimeOptions] = useState<string[]>([]);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const timeOptions = Array.from({ length: 12 }, (_, i) => String(i + 7));
 
@@ -107,8 +114,20 @@ export default function ManageEvents() {
     setEditingEvent(null);
   };
 
+  const confirmUpdate = () => {
+    setConfirmAction("update");
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = (event: EventData) => {
+    setEditingEvent(event);
+    setConfirmAction("delete");
+    setConfirmOpen(true);
+  };
+
   const handleUpdate = async () => {
     if (!editingEvent) return;
+    setActionLoading(true);
 
     await updateDoc(doc(db, "events", editingEvent.id), {
       eventType,
@@ -119,9 +138,25 @@ export default function ManageEvents() {
       endTime,
     });
 
+    setActionLoading(false);
+    setConfirmOpen(false);
     closeModal();
+    await reloadEvents();
+  };
 
-    // Reload events
+  const handleDelete = async () => {
+    if (!editingEvent) return;
+    setActionLoading(true);
+
+    await deleteDoc(doc(db, "events", editingEvent.id));
+
+    setEvents(events.filter((e) => e.id !== editingEvent.id));
+    setActionLoading(false);
+    setConfirmOpen(false);
+    closeModal();
+  };
+
+  const reloadEvents = async () => {
     const ref = collection(db, "events");
     const snap = await getDocs(ref);
     const today = new Date().toISOString().split("T")[0];
@@ -132,11 +167,6 @@ export default function ManageEvents() {
       .sort((a, b) => a.date.localeCompare(b.date));
 
     setEvents(updated);
-  };
-
-  const handleDelete = async (id: string) => {
-    await deleteDoc(doc(db, "events", id));
-    setEvents(events.filter((e) => e.id !== id));
   };
 
   if (loading) return <p className="p-4">Loading...</p>;
@@ -180,7 +210,7 @@ export default function ManageEvents() {
               </button>
 
               <button
-                onClick={() => handleDelete(e.id)}
+                onClick={() => confirmDelete(e)}
                 className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg"
               >
                 <TrashIcon className="w-6 h-6" />
@@ -191,7 +221,7 @@ export default function ManageEvents() {
       </div>
 
       {/* ---------------- MODAL ---------------- */}
-      {modalOpen && (
+      {modalOpen && editingEvent && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white w-full max-w-lg p-6 rounded-xl shadow-lg">
             <div className="flex justify-between items-center mb-4">
@@ -295,12 +325,50 @@ export default function ManageEvents() {
                 </select>
               </div>
 
-              {/* Save Button */}
+              {/* Save Changes Button */}
               <button
-                onClick={handleUpdate}
+                onClick={confirmUpdate}
                 className="w-full py-2 bg-[#0F8A69] text-white rounded-lg hover:bg-[#0d7457]"
               >
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- CONFIRMATION MODAL ---------------- */}
+      {confirmOpen && editingEvent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white w-full max-w-sm p-6 rounded-xl shadow-lg">
+            <h2 className="text-lg font-semibold mb-4">
+              {confirmAction === "update" ? "Confirm Update" : "Confirm Delete"}
+            </h2>
+            <p className="mb-6 text-gray-700">
+              {confirmAction === "update"
+                ? "Are you sure you want to update this event?"
+                : "Are you sure you want to delete this event? This action cannot be undone."}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={
+                  confirmAction === "update" ? handleUpdate : handleDelete
+                }
+                className="px-4 py-2 rounded-lg bg-[#0F8A69] text-white hover:bg-[#0c7356] transition"
+                disabled={actionLoading}
+              >
+                {actionLoading
+                  ? "Processing..."
+                  : confirmAction === "update"
+                    ? "Confirm Update"
+                    : "Confirm Delete"}
               </button>
             </div>
           </div>

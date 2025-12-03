@@ -30,12 +30,12 @@ export default function ManageAppointments() {
 
   const [location, setLocation] = useState("");
   const [reason, setReason] = useState("");
-
-  // NEW ✔ Action State
-
   const [action, setAction] = useState<
     "" | "approve" | "reject" | "fail" | "complete"
   >("");
+
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const statusPriority: Record<Appointment["status"], number> = {
     "waiting for approval": 1,
@@ -50,18 +50,14 @@ export default function ManageAppointments() {
       collection(db, "appointments"),
       orderBy("createdAt", "desc"),
     );
-
     const unsub = onSnapshot(q, (snapshot) => {
       const list: Appointment[] = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...(doc.data() as Omit<Appointment, "id">),
       }));
-
       list.sort((a, b) => statusPriority[a.status] - statusPriority[b.status]);
-
       setAppointments(list);
     });
-
     return () => unsub();
   }, []);
 
@@ -74,7 +70,7 @@ export default function ManageAppointments() {
     setSelected(appt);
     setLocation(appt.location || "");
     setReason(appt.rejectionReason || "");
-    setAction(""); // Reset action
+    setAction("");
     setModalOpen(true);
   };
 
@@ -84,48 +80,54 @@ export default function ManageAppointments() {
     setReason("");
     setAction("");
     setModalOpen(false);
+    setShowConfirm(false);
+    setIsLoading(false);
   };
 
-  const approveAppointment = async () => {
-    if (!selected) return;
+  const handleActionConfirm = async () => {
+    if (!selected || !action) return;
 
-    if (!location.trim()) {
-      alert("Location is required for approval.");
-      return;
+    setIsLoading(true);
+
+    try {
+      if (action === "approve") {
+        if (!location.trim()) {
+          alert("Location is required for approval.");
+          setIsLoading(false);
+          return;
+        }
+        await updateAppointment(selected.id, { status: "approved", location });
+      } else if (action === "reject") {
+        if (!reason.trim()) {
+          alert("Reason is required for rejection.");
+          setIsLoading(false);
+          return;
+        }
+        await updateAppointment(selected.id, {
+          status: "rejected",
+          rejectionReason: reason,
+        });
+      } else if (action === "complete") {
+        await updateAppointment(selected.id, { status: "completed" });
+      } else if (action === "fail") {
+        if (!reason.trim()) {
+          alert("Reason is required for failing.");
+          setIsLoading(false);
+          return;
+        }
+        await updateAppointment(selected.id, {
+          status: "failed",
+          rejectionReason: reason,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred while updating appointment.");
+    } finally {
+      setIsLoading(false);
+      setShowConfirm(false);
+      closeModal();
     }
-
-    await updateAppointment(selected.id, {
-      status: "approved",
-      location,
-    });
-
-    closeModal();
-  };
-
-  const rejectAppointment = async () => {
-    if (!selected) return;
-
-    if (!reason.trim()) {
-      alert("Reason is required for rejection.");
-      return;
-    }
-
-    await updateAppointment(selected.id, {
-      status: "rejected",
-      rejectionReason: reason,
-    });
-
-    closeModal();
-  };
-
-  const markCompleted = async () => {
-    if (!selected) return;
-
-    await updateAppointment(selected.id, {
-      status: "completed",
-    });
-
-    closeModal();
   };
 
   return (
@@ -192,22 +194,21 @@ export default function ManageAppointments() {
             </div>
 
             <button
-              className={`mt-4 px-4 py-2 rounded-lg text-white 
-    ${
-      a.status === "waiting for approval"
-        ? "bg-[#0F8A69] hover:bg-[#0c7356]"
-        : a.status === "approved"
-          ? "bg-blue-600 hover:bg-blue-700"
-          : "bg-gray-400 cursor-default"
-    }`}
+              className={`mt-4 px-4 py-2 rounded-lg text-white ${
+                a.status === "waiting for approval"
+                  ? "bg-[#0F8A69] hover:bg-[#0c7356]"
+                  : a.status === "approved"
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-gray-400 cursor-default"
+              }`}
               onClick={() => {
                 if (
                   a.status === "waiting for approval" ||
                   a.status === "approved"
                 ) {
-                  openModal(a); // editable modal
+                  openModal(a);
                 } else {
-                  openModal(a); // view-only modal
+                  openModal(a);
                 }
               }}
             >
@@ -223,39 +224,51 @@ export default function ManageAppointments() {
 
       {/* Modal */}
       {modalOpen && selected && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-xl w-96">
             <h2 className="text-xl font-semibold mb-4">
-              Respond to Appointment
+              {selected.status === "waiting for approval" ||
+              selected.status === "approved"
+                ? "Respond to Appointment"
+                : "View Appointment"}
             </h2>
 
-            {/* ----------------------------------- */}
-            {/* STATUS: WAITING FOR APPROVAL */}
-            {/* ----------------------------------- */}
-            {selected.status === "waiting for approval" && (
+            {/* Form for actions */}
+            {(selected.status === "waiting for approval" ||
+              selected.status === "approved") && (
               <>
-                {/* Action */}
                 <label className="block mb-1 font-medium">Action</label>
                 <select
                   className="border p-2 rounded-lg w-full mb-4"
                   value={action}
                   onChange={(e) => {
-                    const val = e.target.value as "approve" | "reject" | "";
+                    const val = e.target.value as
+                      | "approve"
+                      | "reject"
+                      | "complete"
+                      | "fail"
+                      | "";
                     setAction(val);
-
-                    if (val === "approve") {
-                      setReason("");
-                    } else if (val === "reject") {
-                      setLocation("");
-                    }
+                    if (val === "approve") setReason("");
+                    if (val === "reject" || val === "fail") setLocation("");
                   }}
                 >
                   <option value="">Choose Action</option>
-                  <option value="approve">Approve</option>
-                  <option value="reject">Reject</option>
+                  {selected.status === "waiting for approval" && (
+                    <>
+                      <option value="approve">Approve</option>
+                      <option value="reject">Reject</option>
+                    </>
+                  )}
+                  {selected.status === "approved" && (
+                    <>
+                      <option value="complete">Mark as Completed</option>
+                      <option value="fail">Mark as Failed</option>
+                    </>
+                  )}
                 </select>
 
-                {/* APPROVE */}
+                {/* Conditional Inputs */}
                 {action === "approve" && (
                   <>
                     <label className="block mb-1 font-medium">Location</label>
@@ -265,120 +278,81 @@ export default function ManageAppointments() {
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                     />
-
-                    <button
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg w-full"
-                      onClick={approveAppointment}
-                    >
-                      Approve Appointment
-                    </button>
                   </>
                 )}
 
-                {/* REJECT */}
-                {action === "reject" && (
+                {(action === "reject" || action === "fail") && (
                   <>
                     <label className="block mb-1 font-medium">Reason</label>
                     <textarea
                       className="border p-2 rounded-lg w-full mb-4"
                       rows={3}
-                      placeholder="Provide a rejection reason"
+                      placeholder="Provide a reason"
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                     />
-
-                    <button
-                      className="bg-red-600 text-white px-4 py-2 rounded-lg w-full"
-                      onClick={rejectAppointment}
-                    >
-                      Reject Appointment
-                    </button>
                   </>
                 )}
-              </>
-            )}
 
-            {/* ----------------------------------- */}
-            {/* STATUS: APPROVED → Complete or Fail */}
-            {/* ----------------------------------- */}
-            {selected.status === "approved" && (
-              <>
-                {/* Action */}
-                <label className="block mb-1 font-medium">Action</label>
-                <select
-                  className="border p-2 rounded-lg w-full mb-4"
-                  value={action}
-                  onChange={(e) => {
-                    const val = e.target.value as "complete" | "fail" | "";
-                    setAction(val);
-                    if (val === "complete") setReason("");
-                  }}
-                >
-                  <option value="">Choose Action</option>
-                  <option value="complete">Mark as Completed</option>
-                  <option value="fail">Mark as Failed</option>
-                </select>
-
-                {/* COMPLETE */}
-                {action === "complete" && (
+                {action && (
                   <button
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg w-full"
-                    onClick={markCompleted}
+                    className={`w-full py-2 rounded-lg text-white ${
+                      action === "approve" || action === "complete"
+                        ? "bg-[#0F8A69] hover:bg-[#0c7356]"
+                        : "bg-red-600 hover:bg-red-700"
+                    }`}
+                    onClick={() => setShowConfirm(true)}
+                    disabled={isLoading}
                   >
-                    Mark Completed
+                    {isLoading ? "Processing..." : "Proceed"}
                   </button>
                 )}
-
-                {/* FAIL */}
-                {action === "fail" && (
-                  <>
-                    <label className="block mb-1 font-medium">
-                      Failure Reason
-                    </label>
-                    <textarea
-                      className="border p-2 rounded-lg w-full mb-4"
-                      rows={3}
-                      placeholder="Explain why this appointment failed"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                    />
-
-                    <button
-                      className="bg-red-600 text-white px-4 py-2 rounded-lg w-full"
-                      onClick={async () => {
-                        if (!reason.trim()) {
-                          alert("Reason is required.");
-                          return;
-                        }
-
-                        await updateAppointment(selected.id, {
-                          status: "failed",
-                          rejectionReason: reason,
-                        });
-
-                        closeModal();
-                      }}
-                    >
-                      Fail Appointment
-                    </button>
-                  </>
-                )}
               </>
             )}
 
-            {/* REJECTED / COMPLETED */}
-            {(selected.status === "rejected" ||
-              selected.status === "completed") && (
+            {/* View-only message */}
+            {selected.status === "rejected" ||
+            selected.status === "completed" ? (
               <p>No further actions available.</p>
-            )}
+            ) : null}
 
-            {/* Close */}
+            {/* Close Button */}
             <button
               className="mt-4 w-full bg-gray-300 py-2 rounded-lg"
               onClick={closeModal}
+              disabled={isLoading}
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirm && selected && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-80">
+            <h2 className="text-lg font-semibold mb-4">Confirm Action</h2>
+            <p className="mb-6 text-gray-700">
+              Are you sure you want to{" "}
+              <span className="font-bold">{action}</span> this appointment?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleActionConfirm}
+                className="px-4 py-2 rounded-lg bg-[#0F8A69] text-white hover:bg-[#0c7356] transition"
+                disabled={isLoading}
+              >
+                {isLoading ? "Processing..." : "Confirm"}
+              </button>
+            </div>
           </div>
         </div>
       )}

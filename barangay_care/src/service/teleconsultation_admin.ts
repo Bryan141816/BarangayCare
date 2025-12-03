@@ -156,12 +156,36 @@ export async function sendDoctorMessage(
 // Claim a session
 // -----------------------------
 export async function claimSession(sessionId: string, adminId: string) {
-  await updateDoc(doc(db, "teleconsultations", sessionId), {
-    responder_id: adminId,
-    status: "active",
-  });
-}
+  try {
+    // 1. Update the teleconsultation session
+    const sessionRef = doc(db, "teleconsultations", sessionId);
+    await updateDoc(sessionRef, {
+      responder_id: adminId,
+      status: "active",
+    });
 
+    // 2. Get the session data (to get the userId)
+    const sessionSnap = await getDoc(sessionRef); // <-- use getDoc()
+    const sessionData = sessionSnap.data();
+
+    if (!sessionData?.userId) return;
+
+    // 3. Create a notification for the user
+    const notificationsRef = collection(db, "notifications");
+    await addDoc(notificationsRef, {
+      to: sessionData.userId, // send to the session owner
+      message: `Your ${sessionData.type || "session"} has been claimed by an admin.`,
+      appointmentId: sessionId, // optional: link to session
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+
+    console.log("Session claimed and user notified successfully.");
+  } catch (error) {
+    console.error("Error claiming session:", error);
+    throw error;
+  }
+}
 // -----------------------------
 // Get all closed sessions assigned to a specific admin
 // -----------------------------

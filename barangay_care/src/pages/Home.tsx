@@ -20,7 +20,6 @@ interface EventData {
   startTime: string;
   endTime: string;
 }
-
 interface AppointmentData {
   id: string;
   location: string;

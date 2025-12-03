@@ -25,7 +25,12 @@ export default function AdminTeleconsultation({
   const [mySessions, setMySessions] = useState<SessionWithUser[]>([]);
   const [closedSessions, setClosedSessions] = useState<SessionWithUser[]>([]);
 
-  // Helper: Attach user profile to sessions
+  const [modalSession, setModalSession] = useState<SessionWithUser | null>(
+    null,
+  );
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  // ---------------- Helper: Attach user profile ----------------
   async function attachUsers(
     sessions: TeleSession[],
   ): Promise<SessionWithUser[]> {
@@ -39,6 +44,7 @@ export default function AdminTeleconsultation({
     return results;
   }
 
+  // ---------------- Fetch sessions ----------------
   useEffect(() => {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -46,7 +52,6 @@ export default function AdminTeleconsultation({
     const dd = String(now.getDate()).padStart(2, "0");
     const todayIdPrefix = `${yyyy}${mm}${dd}`;
 
-    // Listen for open sessions
     const unsub1 = listenOpenSessions(async (sessions) => {
       const todaySessions = sessions.filter((s) =>
         String(s.id).startsWith(todayIdPrefix),
@@ -55,7 +60,6 @@ export default function AdminTeleconsultation({
       setOpenSessions(enriched);
     });
 
-    // Listen for sessions assigned to me
     const unsub2 = listenResponderSessions(userId, async (sessions) => {
       const todaySessions = sessions.filter((s) =>
         String(s.id).startsWith(todayIdPrefix),
@@ -64,7 +68,6 @@ export default function AdminTeleconsultation({
       setMySessions(enriched);
     });
 
-    // Fetch closed sessions
     const fetchClosed = async () => {
       const closed = await getClosedSessionsForAdmin(userId);
       const enriched = await attachUsers(closed);
@@ -77,6 +80,27 @@ export default function AdminTeleconsultation({
       unsub2?.();
     };
   }, [userId]);
+
+  // ---------------- Handle claim session ----------------
+  const handleConfirmClaim = (session: SessionWithUser) => {
+    setModalSession(session);
+  };
+
+  const handleClaimSession = async () => {
+    if (!modalSession) return;
+
+    setIsClaiming(true);
+    try {
+      await claimSession(modalSession.id, userId);
+
+      setModalSession(null);
+    } catch (err) {
+      console.error("Failed to claim session:", err);
+      alert("Failed to claim session. It may have already been claimed.");
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
   return (
     <div className="p-6">
@@ -100,8 +124,8 @@ export default function AdminTeleconsultation({
               <strong>Type:</strong> {s.type || "N/A"}
             </p>
             <button
-              onClick={() => claimSession(s.id, userId)}
-              className="mt-3 bg-[#0F8A69] text-white py-2 px-4 rounded-lg"
+              onClick={() => handleConfirmClaim(s)}
+              className="mt-3 py-2 px-4 rounded-lg text-white bg-[#0F8A69] hover:bg-[#0c7356]"
             >
               Claim Session
             </button>
@@ -134,7 +158,7 @@ export default function AdminTeleconsultation({
         ))}
       </div>
 
-      {/* Closed Sessions (History) */}
+      {/* Closed Sessions */}
       <h2 className="text-lg font-medium mt-8 mb-3">
         Closed Sessions (History)
       </h2>
@@ -160,6 +184,44 @@ export default function AdminTeleconsultation({
           </div>
         ))}
       </div>
+
+      {/* Confirmation Modal */}
+      {modalSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-96">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">
+              Confirm Claim
+            </h2>
+            <p className="mb-6 text-gray-700">
+              Are you sure you want to claim the session for{" "}
+              <strong>
+                {modalSession.user
+                  ? `${modalSession.user.firstName} ${modalSession.user.lastName}`
+                  : modalSession.user_id}
+              </strong>
+              ?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => !isClaiming && setModalSession(null)}
+                className={`px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 ${
+                  isClaiming ? "cursor-not-allowed opacity-50" : ""
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClaimSession}
+                className={`px-4 py-2 rounded-lg bg-[#0F8A69] text-white hover:bg-[#0c7356] ${
+                  isClaiming ? "cursor-not-allowed opacity-50" : ""
+                }`}
+              >
+                {isClaiming ? "Claiming..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

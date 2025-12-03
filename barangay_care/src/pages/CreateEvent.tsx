@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { createEvent } from "../service/eventservice";
 
 export default function CreateEventPage() {
@@ -14,7 +14,9 @@ export default function CreateEventPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Generate time options 7AM – 6PM as STRINGS
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Generate time options 7AM – 6PM as strings
   const timeOptions = Array.from({ length: 12 }, (_, i) => String(i + 7));
 
   const formatTime = (hourString: string) => {
@@ -42,16 +44,16 @@ export default function CreateEventPage() {
     }
   }, [startTime]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setSuccessMessage("");
-    setErrorMessage("");
-
+  const handleSubmit = async () => {
+    // This runs after confirming in the modal
     if (!eventType || !title || !location || !date || !startTime || !endTime) {
       setErrorMessage("Please fill all fields.");
       return;
     }
+
+    setLoading(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
     const eventData = {
       eventType,
@@ -62,17 +64,15 @@ export default function CreateEventPage() {
       endTime,
     };
 
-    setLoading(true);
-
     const result = await createEvent(eventData);
 
     setLoading(false);
+    setShowConfirm(false);
 
     if (result.success) {
       setSuccessMessage("Event created successfully!");
-      setErrorMessage("");
 
-      // Optional reset for form fields
+      // Reset form fields
       setEventType("");
       setTitle("");
       setLocation("");
@@ -105,7 +105,10 @@ export default function CreateEventPage() {
       )}
 
       <form
-        onSubmit={handleSubmit}
+        onSubmit={(e) => {
+          e.preventDefault();
+          setShowConfirm(true);
+        }}
         className="bg-white shadow-md rounded-lg p-6 space-y-4"
       >
         {/* Event Type */}
@@ -233,6 +236,34 @@ export default function CreateEventPage() {
           {loading ? "Saving..." : "Create Event"}
         </button>
       </form>
+
+      {/* Confirmation Modal */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-80">
+            <h2 className="text-lg font-semibold mb-4">Confirm Action</h2>
+            <p className="mb-6 text-gray-700">
+              Are you sure you want to create this event?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="px-4 py-2 rounded-lg bg-[#0F8A69] text-white hover:bg-[#0c7356] transition"
+                disabled={loading}
+              >
+                {loading ? "Saving..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

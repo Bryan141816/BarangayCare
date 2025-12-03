@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../provider/AuthProvider";
 import { createAppointment } from "../service/appointmentservices";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
@@ -30,7 +30,6 @@ const SERVICE_TYPES = {
 
 type ServiceType = (typeof SERVICE_TYPES)[keyof typeof SERVICE_TYPES];
 
-// Display names for UI
 const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   [SERVICE_TYPES.GENERAL_CHECKUP]: "General Check-up",
   [SERVICE_TYPES.VACCINATION]: "Vaccination",
@@ -43,28 +42,24 @@ const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   [SERVICE_TYPES.SENIOR_WELLNESS]: "Senior Citizen Wellness",
   [SERVICE_TYPES.WOUND_CARE]: "Wound Care / Dressing",
 };
+
 export default function BookAppointment() {
   const { currentUser } = useContext(AuthContext);
 
   const [serviceType, setServiceType] = useState("");
   const [preferredDateTime, setPreferredDateTime] = useState("");
   const [purpose, setPurpose] = useState("");
-
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-
   const [latestAppointment, setLatestAppointment] = useState<any | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // ✅ modal state
 
+  const handleSubmit = async () => {
     setErrorMessage("");
     setSuccessMessage("");
-
-    if (!serviceType || !preferredDateTime || !purpose.trim()) {
-      setErrorMessage("All fields are required.");
-      return;
-    }
+    setIsLoading(true);
 
     const appointmentData = {
       serviceType,
@@ -73,19 +68,25 @@ export default function BookAppointment() {
       requestedBy: currentUser?.uid || "unknown-user",
     };
 
-    const result = await createAppointment(appointmentData);
+    try {
+      const result = await createAppointment(appointmentData);
 
-    if (result.success) {
-      setSuccessMessage("Appointment request submitted successfully!");
-      setServiceType("");
-      setPreferredDateTime("");
-      setPurpose("");
-    } else {
-      setErrorMessage(result.error);
+      if (result.success) {
+        setSuccessMessage("Appointment request submitted successfully!");
+        setServiceType("");
+        setPreferredDateTime("");
+        setPurpose("");
+      } else {
+        setErrorMessage(result.error || "Failed to create appointment.");
+      }
+    } catch (err) {
+      setErrorMessage("An error occurred while submitting the appointment.");
+    } finally {
+      setIsLoading(false);
+      setShowConfirmModal(false); // close modal
     }
   };
 
-  // 🔥 Fetch latest non-closed appointment
   useEffect(() => {
     const q = query(
       collection(db, "appointments"),
@@ -95,14 +96,8 @@ export default function BookAppointment() {
     const unsub = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs.map((doc) => {
         const data = doc.data() as Appointment;
-
-        // remove id if exists in doc data
         const { id: _, ...rest } = data;
-
-        return {
-          id: doc.id,
-          ...rest,
-        };
+        return { id: doc.id, ...rest };
       }) as Appointment[];
 
       const activeAppointments = list.filter(
@@ -125,13 +120,11 @@ export default function BookAppointment() {
         Book Appointment
       </h1>
 
-      {/* If APPOINTMENT EXISTS -> SHOW CARD */}
       {latestAppointment ? (
         <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200">
           <h2 className="text-lg font-semibold text-[#0F8A69] mb-3">
             Your Latest Appointment
           </h2>
-
           <div className="space-y-2 text-gray-700">
             <p>
               <span className="font-semibold">Service:</span>{" "}
@@ -145,11 +138,7 @@ export default function BookAppointment() {
               <span className="font-semibold">Preferred Date & Time:</span>{" "}
               {new Date(latestAppointment.preferredDateTime).toLocaleString(
                 "en-US",
-                {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                },
+                { month: "short", day: "numeric", year: "numeric" },
               )}
             </p>
             <p>
@@ -172,19 +161,20 @@ export default function BookAppointment() {
         </div>
       ) : (
         <>
-          {/* ERROR */}
           {errorMessage && (
             <p className="text-red-600 font-medium mb-3">{errorMessage}</p>
           )}
-
-          {/* SUCCESS */}
           {successMessage && (
             <p className="text-green-600 font-medium mb-3">{successMessage}</p>
           )}
-
-          {/* FORM */}
           <div className="bg-white shadow-md rounded-2xl p-8">
-            <form className="space-y-5" onSubmit={handleSubmit}>
+            <form
+              className="space-y-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setShowConfirmModal(true); // show modal on submit click
+              }}
+            >
               <select
                 className="w-full border rounded-lg p-3 outline-none focus:ring-2 focus:ring-[#0F8A69] bg-white"
                 value={serviceType}
@@ -192,16 +182,11 @@ export default function BookAppointment() {
                 required
               >
                 <option value="">Select Service Type</option>
-                <option value="general-checkup">General Check-up</option>
-                <option value="vaccination">Vaccination</option>
-                <option value="prenatal">Prenatal Check-up</option>
-                <option value="child-health">Child Health Consultation</option>
-                <option value="nutrition">Nutrition Assessment</option>
-                <option value="bp-check">Blood Pressure Check</option>
-                <option value="family-planning">Family Planning</option>
-                <option value="dental">Dental Check-up</option>
-                <option value="senior-wellness">Senior Citizen Wellness</option>
-                <option value="wound-care">Wound Care / Dressing</option>
+                {Object.values(SERVICE_TYPES).map((type) => (
+                  <option key={type} value={type}>
+                    {SERVICE_TYPE_LABELS[type]}
+                  </option>
+                ))}
               </select>
 
               <input
@@ -223,13 +208,44 @@ export default function BookAppointment() {
 
               <button
                 type="submit"
-                className="w-full bg-[#0F8A69] hover:bg-[#0c7356] text-white py-3 rounded-lg font-medium transition"
+                disabled={isLoading}
+                className={`w-full bg-[#0F8A69] hover:bg-[#0c7356] text-white py-3 rounded-lg font-medium transition ${
+                  isLoading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
-                Submit
+                {isLoading ? "Submitting..." : "Submit"}
               </button>
             </form>
           </div>
         </>
+      )}
+
+      {/* ✅ Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-96">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">
+              Confirm Appointment
+            </h2>
+            <p className="mb-6 text-gray-700">
+              Are you sure you want to create this appointment?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="px-4 py-2 rounded-lg bg-[#0F8A69] text-white hover:bg-[#0c7356] transition"
+              >
+                {isLoading ? "Submitting..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
