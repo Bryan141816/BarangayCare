@@ -148,7 +148,7 @@ const Header = () => {
             <div
               ref={avatarRef}
               onClick={(e) => e.stopPropagation()}
-              className="absolute right-0 mt-3 w-60 bg-white shadow-xl rounded-xl p-4 text-gray-800 z-50"
+              className="absolute right-0 mt-3 bg-white shadow-xl rounded-xl p-4 text-gray-800 z-50 max-w-sm w-auto"
             >
               <div className="flex items-center space-x-3 mb-4">
                 <div className="bg-teal-600 text-white w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold">
